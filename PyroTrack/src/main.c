@@ -23,6 +23,7 @@
 #include <zephyr/bluetooth/services/bas.h>
 
 #include "temp.h"
+#include "hum.h"
 
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -59,6 +60,7 @@ static void bt_ready(void)
 
 	//hts_init();
 	temp_init();
+    hum_init();
 	
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
@@ -183,6 +185,7 @@ void main(void)
             printf("NOx index: %i (index * 10)\n", nox_index);
             //hts_indicate();
 		    temp_indicate((temperature >> 1)/100);
+            temp_indicate((humidity)/100);
 		    /* Battery level simulation */
 		    bas_notify();
         }

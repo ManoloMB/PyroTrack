@@ -12,8 +12,8 @@
 extern "C" {
 #endif
 
-void temp_init(void);
-void temp_indicate(int16_t temperature);
+void hum_init(void);
+void hum_indicate(int16_t humidity);
 
 #ifdef __cplusplus
 }
