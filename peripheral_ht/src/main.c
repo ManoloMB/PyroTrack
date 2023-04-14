@@ -22,6 +22,7 @@
 #include <zephyr/bluetooth/services/bas.h>
 
 #include "hts.h"
+#include "temp.h"
 
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -57,7 +58,8 @@ static void bt_ready(void)
 	printk("Bluetooth initialized\n");
 
 	hts_init();
-
+	temp_init();
+	
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		printk("Advertising failed to start (err %d)\n", err);
@@ -115,6 +117,7 @@ void main(void)
 
 		/* Temperature measurements simulation */
 		hts_indicate();
+		temp_indicate();
 
 		/* Battery level simulation */
 		bas_notify();

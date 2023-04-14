@@ -25,20 +25,21 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 
+
 #ifdef CONFIG_TEMP_NRF5
 static const struct device *temp_dev = DEVICE_DT_GET_ANY(nordic_nrf_temp);
 #else
 static const struct device *temp_dev;
 #endif
 
-static uint8_t simulate_htm;
-static uint8_t indicating;
-static struct bt_gatt_indicate_params ind_params;
+static uint8_t simulate_temp;
+static uint8_t indicating_temp;
+static struct bt_gatt_indicate_params ind_params_temp;
 
 static void htmc_ccc_cfg_changed(const struct bt_gatt_attr *attr,
 				 uint16_t value)
 {
-	simulate_htm = (value == BT_GATT_CCC_INDICATE) ? 1 : 0;
+	simulate_temp = (value == BT_GATT_CCC_INDICATE) ? 1 : 0;
 }
 
 static void indicate_cb(struct bt_conn *conn,
@@ -50,12 +51,12 @@ static void indicate_cb(struct bt_conn *conn,
 static void indicate_destroy(struct bt_gatt_indicate_params *params)
 {
 	printk("Indication complete\n");
-	indicating = 0U;
+	indicating_temp = 0U;
 }
 
-/* Health Thermometer Service Declaration */
-BT_GATT_SERVICE_DEFINE(hts_svc,
-	BT_GATT_PRIMARY_SERVICE(BT_UUID_HTS),
+/* Temperature Service Declaration */
+BT_GATT_SERVICE_DEFINE(temp_svc,
+	BT_GATT_PRIMARY_SERVICE(BT_UUID_TEMPERATURE),
 	BT_GATT_CHARACTERISTIC(BT_UUID_HTS_MEASUREMENT, BT_GATT_CHRC_INDICATE,
 			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
 	BT_GATT_CCC(htmc_ccc_cfg_changed,
@@ -63,8 +64,7 @@ BT_GATT_SERVICE_DEFINE(hts_svc,
 	/* more optional Characteristics */
 );
 
-
-void hts_init(void)
+void temp_init(void)
 {
 	if (temp_dev == NULL || !device_is_ready(temp_dev)) {
 		printk("no temperature device; using simulated data\n");
@@ -75,19 +75,19 @@ void hts_init(void)
 	}
 }
 
-void hts_indicate(void)
+void temp_indicate(void)
 {
 	/* Temperature measurements simulation */
 	struct sensor_value temp_value;
 
-	if (simulate_htm) {
+	if (simulate_temp) {
 		static uint8_t htm[5];
 		static double temperature = 20U;
 		uint32_t mantissa;
 		uint8_t exponent;
 		int r;
 
-		if (indicating) {
+		if (indicating_temp) {
 			return;
 		}
 
@@ -123,14 +123,14 @@ gatt_indicate:
 		sys_put_le24(mantissa, (uint8_t *)&htm[1]);
 		htm[4] = exponent;
 
-		ind_params.attr = &hts_svc.attrs[2];
-		ind_params.func = indicate_cb;
-		ind_params.destroy = indicate_destroy;
-		ind_params.data = &htm;
-		ind_params.len = sizeof(htm);
+		ind_params_temp.attr = &temp_svc.attrs[2];
+		ind_params_temp.func = indicate_cb;
+		ind_params_temp.destroy = indicate_destroy;
+		ind_params_temp.data = &htm;
+		ind_params_temp.len = sizeof(htm);
 
-		if (bt_gatt_indicate(NULL, &ind_params) == 0) {
-			indicating = 1U;
+		if (bt_gatt_indicate(NULL, &ind_params_temp) == 0) {
+			indicating_temp = 1U;
 		}
 	}
 }
