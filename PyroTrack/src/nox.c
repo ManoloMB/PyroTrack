@@ -27,19 +27,19 @@
 
 
 #ifdef CONFIG_TEMP_NRF5
-static const struct device *hum_dev = DEVICE_DT_GET_ANY(nordic_nrf_temp);
+static const struct device *temp_dev = DEVICE_DT_GET_ANY(nordic_nrf_temp);
 #else
-static const struct device *hum_dev;
+static const struct device *nox_dev;
 #endif
 
-static uint8_t simulate_hum;
-static uint8_t indicating_hum;
-static struct bt_gatt_indicate_params ind_params_hum;
+static uint8_t simulate_nox;
+static uint8_t indicating_nox;
+static struct bt_gatt_indicate_params ind_params_nox;
 
 static void htmc_ccc_cfg_changed(const struct bt_gatt_attr *attr,
 				 uint16_t value)
 {
-	simulate_hum = (value == BT_GATT_CCC_INDICATE) ? 1 : 0;
+	simulate_nox = (value == BT_GATT_CCC_INDICATE) ? 1 : 0;
 }
 
 static void indicate_cb(struct bt_conn *conn,
@@ -51,11 +51,11 @@ static void indicate_cb(struct bt_conn *conn,
 static void indicate_destroy(struct bt_gatt_indicate_params *params)
 {
 	printk("Indication complete\n");
-	indicating_hum= 0U;
+	indicating_nox = 0U;
 }
 
 /* Temperature Service Declaration */
-BT_GATT_SERVICE_DEFINE(hum_svc,
+BT_GATT_SERVICE_DEFINE(nox_svc,
 	BT_GATT_PRIMARY_SERVICE(BT_UUID_HTS),
 	BT_GATT_CHARACTERISTIC(BT_UUID_DIS_SOFTWARE_REVISION, BT_GATT_CHRC_INDICATE,
 			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
@@ -64,44 +64,49 @@ BT_GATT_SERVICE_DEFINE(hum_svc,
 	/* more optional Characteristics */
 );
 
-void hum_init(void)
+void nox_init(void)
 {
-	if (hum_dev == NULL || !device_is_ready(hum_dev)) {
+	if (nox_dev == NULL || !device_is_ready(nox_dev)) {
 		printk("no temperature device; using simulated data\n");
-		hum_dev = NULL;
+		nox_dev = NULL;
 	} else {
-		printk("hum device is %p, name is %s\n", hum_dev,
-		       hum_dev->name);
+		printk("temp device is %p, name is %s\n", nox_dev,
+		       nox_dev->name);
 	}
 }
 
-void hum_indicate(int16_t humidity)
+void nox_indicate(int16_t nox)
 {
 	/* Temperature measurements simulation */
-	struct sensor_value temp_value;
+	struct sensor_value nox_value;
 
-	if (simulate_hum) {
-		static uint8_t htm[9];
+	if (simulate_nox) {
+		static uint8_t htm[10];
 		//static double temperature = 20U;
 		uint32_t mantissa;
 		uint8_t exponent;
 		int r;
 
-		if (indicating_hum) {
+		if (indicating_nox) {
 			return;
 		}
 
-		if (!hum_dev) {
+		if (!nox_dev) {
+			/*temperature++;
+			if (temperature == 30U) {
+				temperature = 20U;
+			}
+*/
 			goto gatt_indicate;
 		}
 
-		r = sensor_sample_fetch(hum_dev);
+		r = sensor_sample_fetch(nox_dev);
 		if (r) {
 			printk("sensor_sample_fetch failed return: %d\n", r);
 		}
 
-		r = sensor_channel_get(hum_dev, SENSOR_CHAN_DIE_TEMP,
-				       &temp_value);
+		r = sensor_channel_get(nox_dev, SENSOR_CHAN_DIE_TEMP,
+				       &nox_value);
 		if (r) {
 			printk("sensor_channel_get failed return: %d\n", r);
 		}
@@ -110,11 +115,11 @@ void hum_indicate(int16_t humidity)
 		
 
 gatt_indicate:
-		printf("hum is %fC\n", humidity);
+		printf("NOX is %fC\n", nox);
 		
 		char buffer[32];
 		const char *str;
-		sprintf(buffer, "Hum: %d%%", humidity);
+		sprintf(buffer, "Nox: %d", nox);
 		str = buffer;
 		uint8_t message_length = strlen(str);
 		//mantissa = (uint32_t)(voc * 100);
@@ -122,14 +127,15 @@ gatt_indicate:
 
 		htm[0] = message_length; /* temperature in celsius */
 		memcpy(&htm[1], str, message_length);
-		ind_params_hum.attr = &hum_svc.attrs[2];
-		ind_params_hum.func = indicate_cb;
-		ind_params_hum.destroy = indicate_destroy;
-		ind_params_hum.data = &htm;
-		ind_params_hum.len = sizeof(htm);
 
-		if (bt_gatt_indicate(NULL, &ind_params_hum) == 0) {
-			indicating_hum = 1;
+		ind_params_nox.attr = &nox_svc.attrs[2];
+		ind_params_nox.func = indicate_cb;
+		ind_params_nox.destroy = indicate_destroy;
+		ind_params_nox.data = &htm;
+		ind_params_nox.len = sizeof(htm);
+
+		if (bt_gatt_indicate(NULL, &ind_params_nox) == 0) {
+			indicating_nox = 1;
 		}
 	}
 }

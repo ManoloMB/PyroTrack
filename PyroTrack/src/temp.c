@@ -25,6 +25,9 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 
+#define TEMP_SERVICE_UUID				0x01, 0x55, 0xBB, 0xDE, 0x5E, 0xCA, 0x78, 0xA1, 0x8E, 0xA2, 0x01, 0x10, 0x40, 0xEC, 0x07, 0xB1
+#define COMMAND_CHARACTERISTIC_UUID		0x01, 0x00, 0xBB, 0xDE, 0x5E, 0xCA, 0x78, 0xA1, 0x8E, 0xA2, 0x01, 0x10, 0x40, 0xEC, 0x07, 0xB1
+#define DATA_CHARACTERISTIC_UUID 		0x00, 0x00, 0xBB, 0xDE, 0x5E, 0xCA, 0x78, 0xA1, 0x8E, 0xA2, 0x01, 0x10, 0x40, 0xEC, 0x07, 0xB1
 
 #ifdef CONFIG_TEMP_NRF5
 static const struct device *temp_dev = DEVICE_DT_GET_ANY(nordic_nrf_temp);
@@ -56,8 +59,8 @@ static void indicate_destroy(struct bt_gatt_indicate_params *params)
 
 /* Temperature Service Declaration */
 BT_GATT_SERVICE_DEFINE(temp_svc,
-	BT_GATT_PRIMARY_SERVICE(BT_UUID_TEMPERATURE),
-	BT_GATT_CHARACTERISTIC(BT_UUID_HTS_MEASUREMENT, BT_GATT_CHRC_INDICATE,
+	BT_GATT_PRIMARY_SERVICE(BT_UUID_HTS),
+	BT_GATT_CHARACTERISTIC(BT_UUID_DIS_SOFTWARE_REVISION, BT_GATT_CHRC_INDICATE,
 			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
 	BT_GATT_CCC(htmc_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
@@ -81,7 +84,7 @@ void temp_indicate(int16_t temperature)
 	struct sensor_value temp_value;
 
 	if (simulate_temp) {
-		static uint8_t htm[5];
+		static uint8_t htm[10];
 		//static double temperature = 20U;
 		uint32_t mantissa;
 		uint8_t exponent;
@@ -117,12 +120,16 @@ void temp_indicate(int16_t temperature)
 gatt_indicate:
 		printf("temperature is %fC\n", temperature);
 		
-		mantissa = (uint32_t)(temperature * 100);
-		exponent = (uint8_t)-2;
+		char buffer[32];
+		const char *str;
+		sprintf(buffer, "Temp: %dC", temperature);
+		str = buffer;
+		uint8_t message_length = strlen(str);
+		//mantissa = (uint32_t)(voc * 100);
+		//exponent = (uint8_t)-2;
 
-		htm[0] = 0; /* temperature in celsius */
-		sys_put_le24(mantissa, (uint8_t *)&htm[1]);
-		htm[4] = exponent;
+		htm[0] = message_length; /* temperature in celsius */
+		memcpy(&htm[1], str, message_length);
 
 		ind_params_temp.attr = &temp_svc.attrs[2];
 		ind_params_temp.func = indicate_cb;
